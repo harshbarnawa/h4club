@@ -1,17 +1,12 @@
-import { useState } from "react"
-
+import { useTheme } from "../context/ThemeContext"
 import Navbar from "./Navbar"
 import Footer from "./Footer"
 import SocialDock from "./SocialDock"
 
-
 function Layout({ children }) {
-
-  const [darkMode, setDarkMode] = useState(true)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const { darkMode } = useTheme()
 
   return (
-
     <div
       className={`min-h-screen text-sm transition-colors duration-300 relative overflow-x-hidden ${
         darkMode
@@ -19,24 +14,11 @@ function Layout({ children }) {
           : "bg-[#ededeb] text-[#2f2f2f]"
       }`}
     >
-
-      <Navbar
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-      />
-
-      <SocialDock darkMode={darkMode} />
-
-      {typeof children === "function"
-        ? children(darkMode)
-        : children}
-
-      <Footer darkMode={darkMode} />
-
+      <Navbar />
+      <SocialDock />
+      <main className="page-enter">{children}</main>
+      <Footer />
     </div>
-
   )
 }
 

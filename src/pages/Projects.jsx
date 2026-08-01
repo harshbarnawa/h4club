@@ -1,166 +1,134 @@
-// pages/Projects.jsx
-
 import Layout from "../components/Layout"
+import { useTheme } from "../context/ThemeContext"
+import { ProjectsData } from "../constants/projects"
+
+const initialLetter = (title) => title.charAt(0).toUpperCase()
 
 function Projects() {
-
-  const projects = [
-
-  {
-    title: "OpenGuido",
-    live: "https://marketplace.visualstudio.com/items?itemName=harshbarnawa.openguido",
-    repo: "https://github.com/harshbarnawa/OpenGuidos",
-    desc: "VS Code extension for easy code snippets, custom commands, competitive programming toolkit and faster development workflow."
-  },
-
-  {
-    title: "h4chat",
-    live: "https://h4chat.vercel.app/",
-    repo: "https://github.com/h4dotai/h4chat",
-    desc: "Random terminal style encrypted chat app...just realtime private communication with Go + WebSockets."
-  },
-
-  {
-    title: "chessBee",
-    live: "https://chessbee.vercel.app/",
-    repo: "https://github.com/harshbarnawa/chessbee",
-    desc: "Online/Offline chess platform with authentication, realtime gameplay logic and custom UI systems."
-  },
-  {
-    title: "Go-Learn",
-    live: "https://github.com/harshbarnawa/Go-learn",
-    repo: "https://github.com/harshbarnawa/Go-learn",
-    desc: "Backend development journey with Go, APIs, databases, concurrency and modern server-side concepts."
-  },
-
-
-  {
-    title: "editostudios",
-    live: "https://edito-studios.vercel.app/",
-    repo: "https://github.com/harshbarnawa/editoStudios",
-    desc: "Minimal creative agency website built with React and modern frontend interactions."
-  },
-
-  {
-    title: "CodeForces",
-    live: "https://codeforces.com/profile/harshbarnawa.info",
-    repo: "https://github.com/harshbarnawa/CodeForces",
-    desc: "Competitive programming, algorithmic problem solving, contest participation and advanced C++ practice."
-  },
-
-  {
-    title: "LeetCode",
-    live: "https://leetcode.com/u/harshtemp/",
-    repo: "https://github.com/harshbarnawa/leetCode",
-    desc: "Data Structures & Algorithms, interview preparation and problem solving across multiple topics."
-  }
-
-];
+  const { darkMode } = useTheme()
 
   return (
-
     <Layout>
-
-      {(darkMode) => (
-
-        <section
-          className={`relative z-10 border-t min-h-screen ${
-            darkMode
-              ? "border-[#262626]"
-              : "border-[#d8d8d8]"
-          }`}
-        >
-
-          <div className="max-w-3xl mx-auto px-5 md:px-6 pt-40 pb-24">
-
+      <section
+        className={`relative z-10 border-t min-h-screen ${
+          darkMode ? "border-[#262626]" : "border-[#d8d8d8]"
+        }`}
+      >
+        <div className="max-w-5xl mx-auto px-5 md:px-6 pt-40 pb-24">
+          <div className="max-w-3xl mb-12">
             <h2
-              className={`text-[11px] uppercase tracking-[3px] mb-12 ${
-                darkMode
-                  ? "text-[#7a7a7a]"
-                  : "text-[#8a8a8a]"
+              className={`text-[11px] uppercase tracking-[3px] ${
+                darkMode ? "text-[#7a7a7a]" : "text-[#8a8a8a]"
               }`}
             >
               Projects
             </h2>
+          </div>
 
-            <div className="space-y-16">
+          {/* Grid layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {ProjectsData.map((project) => {
+              return (
+                <div
+                  key={project.title}
+                  className={`group border rounded-[20px] overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
+                    darkMode
+                      ? "border-[#262626] bg-[#151515]/70"
+                      : "border-[#d8d8d8] bg-[#efefef]/70"
+                  }`}
+                >
+                  {/* Clickable thumbnail */}
+                  <a
+                    href={project.live}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block aspect-video relative overflow-hidden cursor-pointer"
+                  >
+                    <div
+                      className={`w-full h-full flex items-center justify-center transition-transform duration-500 group-hover:scale-105 ${
+                        darkMode ? "bg-[#1e1e1e]" : "bg-[#e2e2e2]"
+                      }`}
+                    >
+                      <span
+                        className={`text-5xl md:text-6xl font-bold select-none ${
+                          darkMode ? "text-white/10" : "text-black/[0.06]"
+                        }`}
+                      >
+                        {initialLetter(project.title)}
+                      </span>
+                    </div>
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+                      <span className="text-white text-[11px] uppercase tracking-[2px] border border-white/40 px-4 py-2 rounded-full backdrop-blur-sm">
+                        View Project →
+                      </span>
+                    </div>
+                  </a>
 
-              {projects.map((project) => (
-
-                <div key={project.title}>
-
-                  <div className="flex flex-col gap-4">
-
-                    <div className="flex items-center flex-wrap gap-4">
-
+                  {/* Project info */}
+                  <div className="p-5">
+                    <div className="flex items-center justify-between mb-2">
                       <h3
-                        className={`font-medium text-[17px] tracking-[-0.02em] ${
-                          darkMode
-                            ? "text-white"
-                            : "text-[#222]"
+                        className={`font-medium text-[15px] tracking-[-0.02em] ${
+                          darkMode ? "text-white" : "text-[#222]"
                         }`}
                       >
                         {project.title}
                       </h3>
-
-                      <div className="flex items-center gap-4">
-
-                        <a
-                          href={project.live}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`text-[12px] transition ${
-                            darkMode
-                              ? "text-[#7a7a7a] hover:text-white"
-                              : "text-[#8a8a8a] hover:text-[#3a3a3a]"
-                          }`}
-                        >
-                          live
-                        </a>
-
-                        <a
-                          href={project.repo}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`text-[12px] transition ${
-                            darkMode
-                              ? "text-[#7a7a7a] hover:text-white"
-                              : "text-[#8a8a8a] hover:text-[#3a3a3a]"
-                          }`}
-                        >
-                          repo
-                        </a>
-
+                      <div className="flex items-center gap-3">
+                        {project.live && (
+                          <a
+                            href={project.live}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`text-[11px] transition ${
+                              darkMode
+                                ? "text-[#7a7a7a] hover:text-white"
+                                : "text-[#8a8a8a] hover:text-[#3a3a3a]"
+                            }`}
+                          >
+                            live ↗
+                          </a>
+                        )}
+                        {project.repo && (
+                          <a
+                            href={project.repo}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`text-[11px] transition ${
+                              darkMode
+                                ? "text-[#7a7a7a] hover:text-white"
+                                : "text-[#8a8a8a] hover:text-[#3a3a3a]"
+                            }`}
+                          >
+                            repo ↗
+                          </a>
+                        )}
                       </div>
-
                     </div>
-
                     <p
-                      className={`leading-[2] text-[15px] max-w-2xl ${
-                        darkMode
-                          ? "text-[#a1a1a1]"
-                          : "text-[#5f5f5f]"
+                      className={`text-[13px] leading-[1.7] ${
+                        darkMode ? "text-[#a1a1a1]" : "text-[#5f5f5f]"
                       }`}
                     >
                       {project.desc}
                     </p>
-
                   </div>
-
                 </div>
-
-              ))}
-
-            </div>
-
+              )
+            })}
           </div>
 
-        </section>
-
-      )}
-
+          {/* Footer note */}
+          <p
+            className={`text-[12px] mt-12 text-center ${
+              darkMode ? "text-[#555]" : "text-[#999]"
+            }`}
+          >
+            more projects brewing...
+          </p>
+        </div>
+      </section>
     </Layout>
-
   )
 }
 
