@@ -15,6 +15,11 @@ export const DockLinks = [
     alt: "Twitter / X Profile",
   },
   {
+    icon: "/assets/youtube.svg",
+    link: "https://youtube.com/@harshbarnawa",
+    alt: "YouTube Channel",
+  },
+  {
     icon: "/assets/email.png",
     link: "mailto:harshbarnawa.info@gmail.com",
     alt: "Send Email",
@@ -26,7 +31,7 @@ export const SocialLinks = [
   ...DockLinks,
   {
     icon: "/assets/instagram.png",
-    link: "https://www.instagram.com/harshbarnawa/",
+    link: "https://www.instagram.com/harshbarnawa_/",
     alt: "Instagram Profile",
   },
   {
