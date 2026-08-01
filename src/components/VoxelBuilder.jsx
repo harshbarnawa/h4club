@@ -92,6 +92,13 @@ const PRESETS = [
   },
 ]
 
+// Heart is the default design shown when the renderer opens fresh
+const DEFAULT_PRESET = PRESETS.find((p) => p.name === "Heart")
+
+function presetToGrid(preset) {
+  return preset.rows.map((row) => row.split("").map((ch) => (ch.toLowerCase() === "x" ? preset.color : null)))
+}
+
 function emptyGrid(size) {
   return Array.from({ length: size }, () => Array(size).fill(null))
 }
@@ -155,20 +162,41 @@ function ToolIcon({ name, className = "w-4 h-4" }) {
   )
 }
 
+// Cursor that matches the active tool (theme-aware pen / eraser, drawn as data-URI SVGs)
+function cursorFor(tool, darkMode) {
+  const outer = darkMode ? "%23ffffff" : "%23000000"
+  const inner = darkMode ? "%23000000" : "%23ffffff"
+
+  const pencil = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='translate(6 4)'%3E%3Cpath d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z' fill='none' stroke='${outer}' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z' fill='none' stroke='${inner}' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E") 8 26, auto`
+
+  const eraser = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='translate(5 6)'%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21' fill='none' stroke='${outer}' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M22 21H7' fill='none' stroke='${outer}' stroke-width='4'/%3E%3Cpath d='m5 11 9 9' fill='none' stroke='${outer}' stroke-width='4'/%3E%3Cpath d='m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21' fill='none' stroke='${inner}' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M22 21H7' fill='none' stroke='${inner}' stroke-width='2'/%3E%3Cpath d='m5 11 9 9' fill='none' stroke='${inner}' stroke-width='2'/%3E%3C/g%3E%3C/svg%3E") 15 18, auto`
+
+  const fill = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='translate(6 5)'%3E%3Cpath d='M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z' fill='none' stroke='${outer}' stroke-width='4' stroke-linejoin='round'/%3E%3Cpath d='M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z' fill='none' stroke='${inner}' stroke-width='1.8' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E") 18 25, auto`
+
+  if (tool === "erase") return eraser
+  if (tool === "fill") return fill
+  return pencil
+}
+
 function VoxelBuilder() {
   const { darkMode } = useTheme()
 
   // Load persisted state once via lazy init (avoids setState-in-effect)
   const [savedState] = useState(loadSavedState)
   const [gridSize, setGridSize] = useState(savedState?.size ?? DEFAULT_SIZE)
-  const [grid, setGrid] = useState(() => savedState?.grid ?? emptyGrid(DEFAULT_SIZE))
+  const [grid, setGrid] = useState(
+    () => savedState?.grid ?? (DEFAULT_PRESET ? presetToGrid(DEFAULT_PRESET) : emptyGrid(DEFAULT_SIZE)),
+  )
   const [tool, setTool] = useState("draw")
-  const [activeColor, setActiveColor] = useState(PALETTE[0])
+  const [activeColor, setActiveColor] = useState(
+    savedState ? PALETTE[0] : DEFAULT_PRESET?.color ?? PALETTE[0],
+  )
   const [extrude, setExtrude] = useState(savedState?.extrude ?? 2)
   const [autoRotate, setAutoRotate] = useState(false)
   const [showEdges, setShowEdges] = useState(false)
-  const [viewportBg, setViewportBg] = useState("auto") // auto | white | black
   const [symMode, setSymMode] = useState("off") // off | h | v | both
+  const [showMirrorLine, setShowMirrorLine] = useState(true) // mirror axis guide on slate
+  const [isRightHeld, setIsRightHeld] = useState(false) // right-click = quick erase
   const [isDrawing, setIsDrawing] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
@@ -226,10 +254,10 @@ function VoxelBuilder() {
     return cells
   }
 
-  const paint = (r, c) => {
+  const paint = (r, c, forceErase = false) => {
     setGrid((prev) => {
       const cells = getSymCells(r, c)
-      const value = tool === "erase" ? null : activeColor
+      const value = forceErase || tool === "erase" ? null : activeColor
       const next = prev.map((row) => [...row])
       let changed = false
       for (const [cr, cc] of cells) {
@@ -272,18 +300,20 @@ function VoxelBuilder() {
 
   const onCellPointerDown = (r, c, e) => {
     e.preventDefault()
-    if (tool === "fill") {
+    const rightClick = e.button === 2
+    if (tool === "fill" && !rightClick) {
       bucketFill(r, c)
       return
     }
     beginStroke()
-    paint(r, c)
+    paint(r, c, rightClick)
   }
 
-  const onCellPointerEnter = (r, c) => {
+  const onCellPointerEnter = (r, c, e) => {
     if (!isDrawing || tool === "fill") return
     beginStroke()
-    paint(r, c)
+    // e.buttons === 2 means the right mouse button is held during a drag
+    paint(r, c, e.buttons === 2)
   }
 
   // ----- actions -----
@@ -301,15 +331,11 @@ function VoxelBuilder() {
 
   const loadPreset = (preset) => {
     pushPast(snap())
-    const size = preset.rows.length
-    setGridSize(size)
-    setGrid(preset.rows.map((row) => row.split("").map((ch) => (ch.toLowerCase() === "x" ? preset.color : null))))
+    setGridSize(preset.rows.length)
+    setGrid(presetToGrid(preset))
     setActiveColor(preset.color)
     setTool("draw")
   }
-
-  const cycleBg = () =>
-    setViewportBg((b) => (b === "auto" ? "white" : b === "white" ? "black" : "auto"))
 
   // ----- keyboard shortcuts (Ctrl/Cmd+Z / +Shift+Z / +Y) -----
   useEffect(() => {
@@ -344,6 +370,8 @@ function VoxelBuilder() {
   }, [grid, gridSize, extrude])
 
   const filled = grid.flat().filter(Boolean).length
+  // Right-click always erases, so its cursor should be the eraser too
+  const cursor = cursorFor(isRightHeld ? "erase" : tool, darkMode)
 
   const card = darkMode
     ? "border-[#262626] bg-[#151515]/70"
@@ -374,8 +402,76 @@ function VoxelBuilder() {
             </span>
           </div>
 
-          {/* tools */}
+          {/* presets */}
           <div className="mb-4 flex items-center gap-2 flex-wrap">
+            <span className={`text-[10px] uppercase tracking-[2px] mr-1 ${micro}`}>Presets</span>
+            {PRESETS.map((p) => (
+              <button
+                key={p.name}
+                onClick={() => loadPreset(p)}
+                title={p.name}
+                aria-label={`Load ${p.name} preset`}
+                className={`w-8 h-8 rounded-full border flex items-center justify-center text-[15px] leading-none transition ${btnInactive}`}
+              >
+                {p.emoji}
+              </button>
+            ))}
+          </div>
+
+          {/* symmetry */}
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
+            <span className={`text-[10px] uppercase tracking-[2px] mr-1 ${micro}`}>Mirror</span>
+            {["off", "h", "v", "both"].map((m) => (
+              <button
+                key={m}
+                onClick={() => setSymMode(m)}
+                className={`px-2.5 py-1.5 rounded-full border text-[11px] uppercase transition ${
+                  symMode === m ? btnActive : btnInactive
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowMirrorLine((v) => !v)}
+              title="Toggle mirror axis guide line"
+              className={`px-2.5 py-1.5 rounded-full border text-[11px] uppercase transition ${
+                showMirrorLine ? btnActive : btnInactive
+              }`}
+            >
+              Line
+            </button>
+          </div>
+
+          {/* palette */}
+          <div className="mb-5 flex items-center gap-2.5 flex-wrap">
+            {PALETTE.map((col) => (
+              <button
+                key={col}
+                onClick={() => setActiveColor(col)}
+                title={col}
+                aria-label={`Pick color ${col}`}
+                className={`w-6 h-6 rounded-full border transition ${
+                  activeColor === col
+                    ? `ring-2 ${darkMode ? "ring-white" : "ring-black"} scale-110 border-black/20`
+                    : "border-black/20 hover:scale-110"
+                }`}
+                style={{ backgroundColor: col }}
+              />
+            ))}
+            <input
+              type="color"
+              value={activeColor}
+              onChange={(e) => setActiveColor(e.target.value)}
+              title="Custom color"
+              aria-label="Custom color picker"
+              className="w-6 h-6 rounded-full border border-black/20 cursor-pointer overflow-hidden p-0"
+              style={{ backgroundColor: activeColor }}
+            />
+          </div>
+
+          {/* tools */}
+          <div className="mb-5 flex items-center gap-2 flex-wrap">
             {["draw", "erase", "fill"].map((t) => (
               <button
                 key={t}
@@ -408,78 +504,30 @@ function VoxelBuilder() {
             <button
               onClick={clear}
               title="Clear"
-              className={`px-3 py-1.5 rounded-full border text-[11px] uppercase tracking-[1px] transition ${btnInactive}`}
+              className={`px-3 py-1.5 rounded-full border text-[11px] uppercase tracking-[1px] transition ml-auto ${btnInactive}`}
             >
               Clear
             </button>
           </div>
 
-          {/* symmetry */}
-          <div className="mb-4 flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] uppercase tracking-[2px] mr-1 ${micro}`}>Mirror</span>
-            {["off", "h", "v", "both"].map((m) => (
-              <button
-                key={m}
-                onClick={() => setSymMode(m)}
-                className={`px-2.5 py-1.5 rounded-full border text-[11px] uppercase transition ${
-                  symMode === m ? btnActive : btnInactive
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-
-          {/* palette */}
-          <div className="mb-5 flex items-center gap-2.5 flex-wrap">
-            {PALETTE.map((col) => (
-              <button
-                key={col}
-                onClick={() => setActiveColor(col)}
-                title={col}
-                aria-label={`Pick color ${col}`}
-                className={`w-6 h-6 rounded-full border transition ${
-                  activeColor === col
-                    ? `ring-2 ${darkMode ? "ring-white" : "ring-black"} scale-110 border-black/20`
-                    : "border-black/20 hover:scale-110"
-                }`}
-                style={{ backgroundColor: col }}
-              />
-            ))}
-            <input
-              type="color"
-              value={activeColor}
-              onChange={(e) => setActiveColor(e.target.value)}
-              title="Custom color"
-              aria-label="Custom color picker"
-              className="w-6 h-6 rounded-full border border-black/20 cursor-pointer overflow-hidden p-0"
-              style={{ backgroundColor: activeColor }}
-            />
-          </div>
-
-          {/* presets */}
-          <div className="mb-5 flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] uppercase tracking-[2px] mr-1 ${micro}`}>Presets</span>
-            {PRESETS.map((p) => (
-              <button
-                key={p.name}
-                onClick={() => loadPreset(p)}
-                title={p.name}
-                aria-label={`Load ${p.name} preset`}
-                className={`w-8 h-8 rounded-full border flex items-center justify-center text-[15px] leading-none transition ${btnInactive}`}
-              >
-                {p.emoji}
-              </button>
-            ))}
-          </div>
-
           {/* grid */}
           <div
-            className="select-none touch-none grid gap-[2px] w-full max-w-[420px] mx-auto"
-            style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))` }}
-            onPointerDown={() => setIsDrawing(true)}
-            onPointerUp={() => endStroke()}
-            onPointerLeave={() => endStroke()}
+            className="relative select-none touch-none grid gap-[2px] w-full max-w-[420px] mx-auto"
+            style={{ gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`, cursor }}
+            onPointerDown={(e) => {
+              setIsDrawing(true)
+              setIsRightHeld(e.button === 2)
+            }}
+            onPointerUp={() => {
+              endStroke()
+              setIsRightHeld(false)
+            }}
+            onPointerLeave={() => {
+              endStroke()
+              setIsRightHeld(false)
+            }}
+            onPointerEnter={(e) => setIsRightHeld(e.buttons === 2)}
+            onContextMenu={(e) => e.preventDefault()}
           >
             {Array.from({ length: gridSize * gridSize }, (_, i) => {
               const r = Math.floor(i / gridSize)
@@ -489,14 +537,28 @@ function VoxelBuilder() {
                 <div
                   key={i}
                   onPointerDown={(e) => onCellPointerDown(r, c, e)}
-                  onPointerEnter={() => onCellPointerEnter(r, c)}
-                  className={`aspect-square rounded-[2px] cursor-pointer transition-colors duration-75 ${
+                  onPointerEnter={(e) => onCellPointerEnter(r, c, e)}
+                  className={`aspect-square rounded-[2px] transition-colors duration-75 ${
                     cell ? "" : cellEmpty
                   }`}
                   style={cell ? { backgroundColor: cell } : undefined}
                 />
               )
             })}
+
+            {/* mirror axis guide */}
+            {showMirrorLine && (symMode === "h" || symMode === "both") && (
+              <div
+                className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] pointer-events-none"
+                style={{ backgroundColor: darkMode ? "#ffffff" : "#111111", opacity: 0.6 }}
+              />
+            )}
+            {showMirrorLine && (symMode === "v" || symMode === "both") && (
+              <div
+                className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] pointer-events-none"
+                style={{ backgroundColor: darkMode ? "#ffffff" : "#111111", opacity: 0.6 }}
+              />
+            )}
           </div>
 
           {/* grid size */}
@@ -557,22 +619,6 @@ function VoxelBuilder() {
                 Edges
               </button>
               <button
-                onClick={cycleBg}
-                title="Cycle viewport background"
-                className={`px-3 py-1.5 rounded-full border text-[11px] uppercase tracking-[1px] transition ${
-                  viewportBg !== "auto" ? btnActive : btnInactive
-                }`}
-              >
-                BG · {viewportBg}
-              </button>
-              <button
-                onClick={() => apiRef.current?.capture()}
-                title="Download 3D view as PNG"
-                className={`px-3 py-1.5 rounded-full border text-[11px] uppercase tracking-[1px] transition ${btnInactive}`}
-              >
-                PNG
-              </button>
-              <button
                 onClick={() => apiRef.current?.reset()}
                 title="Reset camera view"
                 className={`px-3 py-1.5 rounded-full border text-[11px] uppercase tracking-[1px] transition ${btnInactive}`}
@@ -582,16 +628,22 @@ function VoxelBuilder() {
             </div>
           </div>
 
-          <div className="h-[320px] md:h-[420px]">
+          <div className="relative h-[320px] md:h-[420px]">
             <VoxelViewport
               grid={grid}
               size={gridSize}
               extrude={extrude}
               showEdges={showEdges}
               autoRotate={autoRotate}
-              viewportBg={viewportBg}
               apiRef={apiRef}
             />
+            <button
+              onClick={() => apiRef.current?.capture()}
+              title="Save as PNG"
+              className="absolute bottom-3 right-3 px-4 py-2 rounded-full bg-white text-black border border-black/10 text-[11px] uppercase tracking-[1px] shadow-lg hover:opacity-90 transition z-10"
+            >
+              Save as PNG
+            </button>
           </div>
         </div>
       </div>

@@ -128,14 +128,12 @@ function VoxelMesh({ grid, size, extrude, showEdges, edgeColor }) {
   )
 }
 
-function VoxelViewport({ grid, size, extrude, showEdges, autoRotate, viewportBg = "auto", apiRef }) {
+function VoxelViewport({ grid, size, extrude, showEdges, autoRotate, apiRef }) {
   const { darkMode } = useTheme()
   const controlsRef = useRef(null)
 
-  // viewportBg: auto (follow theme) | white | black
-  const isDarkBg = viewportBg === "black" || (viewportBg === "auto" && darkMode)
-  const bg =
-    viewportBg === "white" ? "#ffffff" : viewportBg === "black" ? "#000000" : darkMode ? "#0d0d0d" : "#f4f4f5"
+  const isDarkBg = darkMode
+  const bg = darkMode ? "#1a1a1a" : "#f4f4f5"
   const edgeColor = isDarkBg ? "#d4d4d4" : "#334155"
   const gridLine = isDarkBg ? "#2a2a2a" : "#d4d4d8"
   const gridCenter = isDarkBg ? "#4b4b4b" : "#a1a1aa"
