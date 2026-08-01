@@ -8,10 +8,12 @@
  * Providers (selected automatically):
  *   • Official X API v2  — used when X_BEARER_TOKEN is set. Reliable, but the
  *                          X API needs a paid "Basic" tier to read timelines.
- *   • Free widget source  — used when no token is set. Zero cost; reads X's
- *                          public syndication widget. X currently blocks that
- *                          widget for anonymous requests in many regions, so
- *                          the official API is the dependable option.
+ *   • Free source        — used when no token is set. Zero cost, no secrets:
+ *                          X's public profile page (server-rendered for SEO)
+ *                          lists the latest tweet ids, and publish.twitter.com's
+ *                          oEmbed endpoint returns each tweet's text + date.
+ *                          (The old syndication widget is now blocked by X for
+ *                          anonymous requests, so it was replaced.)
  *
  * Behaviour (both providers):
  *   • Ignores the pinned tweet, retweets and replies.
@@ -26,7 +28,6 @@
  *   X_USERNAME           — X handle without "@"     (default "harshbarnawa")
  *   X_BEARER_TOKEN       — optional; enables official API provider
  *   X_API_BASE           — official API base        (default https://api.x.com)
- *   X_SYNDICATION_BASE   — free widget base         (default https://cdn.syndication.twimg.com)
  *   POSTS_FILE           — output path               (default src/data/posts.json)
  *   MAX_POSTS            — how many posts to keep    (default 5)
  *   X_EXCLUDE            — official API kinds to skip (default "retweets,replies")
@@ -43,7 +44,6 @@ const PROJECT_ROOT = path.resolve(__dirname, "..")
 
 // --------------------------------------------------------------- config ----
 const API_BASE = process.env.X_API_BASE || "https://api.x.com"
-const SYNDICATION_BASE = process.env.X_SYNDICATION_BASE || "https://cdn.syndication.twimg.com"
 const USERNAME = (process.env.X_USERNAME || "harshbarnawa").replace(/^@/, "").trim()
 const BEARER_TOKEN = (process.env.X_BEARER_TOKEN || "").trim()
 const POSTS_FILE = path.resolve(
@@ -207,61 +207,137 @@ async function fetchOfficial() {
     })
 }
 
-// ------------------------------------------------- provider: free widget ----
-async function fetchFree() {
-  console.log(`[sync] provider: free syndication widget (@${USERNAME})`)
+// ------------------------------------------------- provider: free (no token) ----
+/**
+ * Free provider (no token): X's profile page is server-rendered for SEO, so it
+ * ships the user's latest tweet ids in the HTML, and the oEmbed endpoint
+ * (publish.twitter.com — the same one every site uses to embed a tweet) returns
+ * each tweet's text and date. Together they give a zero-cost timeline, with no
+ * secrets. X blocks the old syndication widget for anonymous requests, so this
+ * replaces it.
+ */
 
-  // The syndication widget needs to think it is a browser, not a bot.
-  const url = `${SYNDICATION_BASE}/timeline/profile?screen_name=${encodeURIComponent(USERNAME)}&lang=en`
-  const res = await httpGet(url, {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-    Referer: "https://platform.twitter.com/",
+/** Minimal HTML entity decoder (oEmbed text arrives HTML-escaped). */
+function decodeHtmlEntities(value) {
+  const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " }
+  return (value || "").replace(/&(#[0-9]+|#x[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, entity) => {
+    if (entity[0] === "#") {
+      const code =
+        entity[1].toLowerCase() === "x"
+          ? parseInt(entity.slice(2), 16)
+          : parseInt(entity.slice(1), 10)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : whole
+    }
+    return named[entity] ?? whole
   })
-  const body = await res.text()
+}
 
-  // X returns an empty body to anonymous/blocked widget requests.
-  if (!body.trim()) {
+async function fetchProfilePage() {
+  const url = `https://x.com/${USERNAME}`
+  const res = await httpGet(url, {
+    // The profile page serves the full HTML (with tweet ids) to browser UAs.
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+    Referer: "https://x.com/",
+  })
+  return await res.text()
+}
+
+/** Every /status/<id> the profile page server-renders — the latest tweets. */
+function extractTweetIds(html) {
+  const ids = [...html.matchAll(new RegExp(`/${USERNAME}/status/(\\d{15,19})`, "g"))].map((m) => m[1])
+  return [...new Set(ids)]
+}
+
+/** X marks the pinned tweet in the embedded page state: component:"pinned_tweets". */
+function extractPinnedTweetId(html) {
+  const match = html.match(/tweet-(\d{15,19}):content:client_event_info[^}]*?"pinned_tweets"/)
+  return match ? match[1] : null
+}
+
+async function fetchOEmbed(tweetId) {
+  const url = `https://publish.twitter.com/oembed?${new URLSearchParams({
+    url: `https://x.com/${USERNAME}/status/${tweetId}`,
+    omit_script: "true",
+    lang: "en", // forces an English month name in the date, so parsing is stable
+  }).toString()}`
+  const res = await httpGet(url)
+  return await res.json()
+}
+
+/** Pull text, date and hashtags out of the oEmbed blockquote HTML. */
+function parseOEmbed(data) {
+  const html = data.html || ""
+  const paragraph = html.match(/<p[^>]*>([\s\S]*?)<\/p>/)
+  let text = paragraph ? paragraph[1] : ""
+
+  text = text.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ")
+  text = cleanText(decodeHtmlEntities(text))
+  // oEmbed keeps self-referencing media links (pic.twitter.com/…) in the body.
+  text = text.replace(/pic\.twitter\.com\/[A-Za-z0-9]+/gi, "").replace(/\s+/g, " ").trim()
+
+  // The blockquote ends with the date anchor, e.g. ">July 12, 2026</a>".
+  // Build the date at UTC noon so the displayed day never shifts with the TZ.
+  const dateMatch = html.match(/>([A-Za-z]{3,9} \d{1,2}, \d{4})<\/a>\s*<\/blockquote>/)
+  const MONTHS = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 }
+  let createdAt = null
+  if (dateMatch) {
+    const [monthName, day, year] = dateMatch[1].split(/[\s,]+/)
+    const month = MONTHS[monthName.slice(0, 3)]
+    if (month !== undefined && day && year) {
+      createdAt = new Date(Date.UTC(Number(year), month, Number(day), 12)).toISOString()
+    }
+  }
+
+  return {
+    text,
+    createdAt,
+    hashtags: [...text.matchAll(/#([A-Za-z0-9_]+)/g)].map((m) => m[1]),
+  }
+}
+
+async function fetchFree() {
+  console.log(`[sync] provider: free profile page + oEmbed (@${USERNAME})`)
+
+  const html = await fetchProfilePage()
+
+  const tweetIds = extractTweetIds(html)
+  if (tweetIds.length === 0) {
     console.warn(
-      "[sync] free source returned an empty response — X currently blocks anonymous widget " +
-        "access in many regions. Nothing was changed. Add X_BEARER_TOKEN (official API, " +
+      "[sync] profile page returned no tweet ids — X may have served a login wall. " +
+        "Nothing was changed. If this persists, add X_BEARER_TOKEN (official API, " +
         "requires the paid Basic tier) for a reliable sync.",
     )
     return []
   }
 
-  let data
-  try {
-    data = JSON.parse(body)
-  } catch (err) {
-    throw new Error(`invalid widget response: ${err.message}`, { cause: err })
+  const pinnedTweetId = extractPinnedTweetId(html)
+  if (pinnedTweetId) console.log(`[sync] skipping pinned tweet ${pinnedTweetId}`)
+
+  const profileUrl = `https://x.com/${USERNAME}`
+  const posts = []
+
+  for (const id of tweetIds) {
+    if (id === pinnedTweetId) continue
+    try {
+      const oEmbed = await fetchOEmbed(id)
+      const { text, createdAt, hashtags } = parseOEmbed(oEmbed)
+      if (!text) continue // media-only tweets have no text to render
+      posts.push({
+        id,
+        text,
+        createdAt,
+        url: `${profileUrl}/status/${id}`,
+        media: [],
+        hashtags,
+        links: [],
+      })
+    } catch (err) {
+      console.warn(`[sync] oEmbed failed for tweet ${id}: ${err.message}`)
+    }
   }
 
-  const rawTweets = Array.isArray(data?.timeline?.tweet) ? data.timeline.tweet : []
-  const pinnedTweetId = data?.pinned_tweet?.id_str || data?.pinned_tweet?.id || null
-  const profileUrl = `https://x.com/${USERNAME}`
-
-  return rawTweets
-    .filter((tweet) => tweet.id_str !== pinnedTweetId && tweet.id !== pinnedTweetId)
-    .filter((tweet) => !tweet.retweeted && !tweet.in_reply_to_status_id) // skip retweets + replies
-    .map((tweet) => {
-      const entities = tweet.entities || {}
-      const media = (tweet.extended_entities?.media || entities.media || [])
-        .map((m) => ({ type: m.type, url: m.media_url_https || m.media_url }))
-        .filter((m) => m.url)
-
-      return {
-        id: tweet.id_str || tweet.id,
-        text: cleanText(tweet.full_text || tweet.text),
-        createdAt: parseDate(tweet.created_at),
-        url: `${profileUrl}/status/${tweet.id_str || tweet.id}`,
-        media,
-        hashtags: (entities.hashtags || []).map((h) => h.text || h.tag),
-        links: (entities.urls || [])
-          .map((u) => u.expanded_url || u.url)
-          .filter(isExternalLink),
-      }
-    })
-    .filter((post) => post.id)
+  return posts
 }
 
 // ------------------------------------------------------------------ store ----

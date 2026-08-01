@@ -1,5 +1,42 @@
 {
-  "updatedAt": null,
+  "updatedAt": "2026-08-01T09:55:28.620Z",
   "source": "https://x.com/harshbarnawa",
-  "posts": []
+  "posts": [
+    {
+      "id": "2076285218873659808",
+      "text": "What about this? Emu8086",
+      "createdAt": "2026-07-12T12:00:00.000Z",
+      "url": "https://x.com/harshbarnawa/status/2076285218873659808",
+      "media": [],
+      "hashtags": [],
+      "links": []
+    },
+    {
+      "id": "2071614918345028089",
+      "text": "Is it worth to solve 1200 rated ques on @codeforces @TLE_Eliminators daily? Day 1 of solving 1200 rated ques...",
+      "createdAt": "2026-06-29T12:00:00.000Z",
+      "url": "https://x.com/harshbarnawa/status/2071614918345028089",
+      "media": [],
+      "hashtags": [],
+      "links": []
+    },
+    {
+      "id": "2070975965417939369",
+      "text": "Only 1 problem solved today..clearly I need more contest practice onward...",
+      "createdAt": "2026-06-27T12:00:00.000Z",
+      "url": "https://x.com/harshbarnawa/status/2070975965417939369",
+      "media": [],
+      "hashtags": [],
+      "links": []
+    },
+    {
+      "id": "2070712979189063725",
+      "text": "Codeforces nowadays ...",
+      "createdAt": "2026-06-27T12:00:00.000Z",
+      "url": "https://x.com/harshbarnawa/status/2070712979189063725",
+      "media": [],
+      "hashtags": [],
+      "links": []
+    }
+  ]
 }

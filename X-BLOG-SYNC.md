@@ -19,8 +19,8 @@ ever stored and displayed.
                                     │                                │
                       X_BEARER_TOKEN set?                    no token set
                                     │                                │
-                        Official X API v2                   free widget
-                        (reliable, paid Basic)              (zero cost)
+                        Official X API v2            profile page + oEmbed
+                        (reliable, paid Basic)         (zero cost, no keys)
                                     │                                │
                                     └──────────────┬─────────────────┘
                                                    │ new posts?
@@ -56,14 +56,15 @@ Key decisions:
 
 ### 1. Free — no API key (default)
 
-The script uses X's public **syndication widget**
-(`cdn.syndication.twimg.com/timeline/profile?screen_name=…`) — the same feed
-X powers its embed widgets with. **Zero cost, no secrets, no signup.**
+The script uses two public, unauthenticated X endpoints:
 
-⚠️ **Important caveat:** as of 2026 X blocks that widget for anonymous requests
-in many regions. The sync script handles this gracefully (logs a clear warning,
-leaves `posts.json` untouched). It *may* work from GitHub Actions' US runners —
-the first run will tell you. If it comes back empty, switch to option 2.
+1. `x.com/<username>` — the **profile page**. X server-renders it for SEO, so
+   it ships the latest tweet ids right in the HTML.
+2. `publish.twitter.com/oembed` — the **same endpoint every site uses to embed
+   a tweet**. Returns each tweet's text and date.
+
+**Zero cost, no secrets, no signup.** (The old syndication widget is dead — X
+returns an empty body to anonymous widget requests, so it was replaced.)
 
 ### 2. Official X API — reliable (needs the paid Basic tier)
 
@@ -120,7 +121,7 @@ sensitive.
 ## Local testing
 
 ```bash
-# runs against the free widget source (no setup needed)
+# runs against the free profile page + oEmbed source (no setup needed)
 npm run sync:twitter
 
 # force the official API (set the token in your shell / .env)
@@ -138,7 +139,6 @@ To preview the blog locally: `npm run dev`, then open `/blog`.
 | `X_USERNAME`        | `harshbarnawa`                 | X handle without `@`                          |
 | `X_BEARER_TOKEN`    | —                              | Official API bearer token (optional)           |
 | `X_API_BASE`        | `https://api.x.com`            | Official API base URL                          |
-| `X_SYNDICATION_BASE`| `https://cdn.syndication.twimg.com` | Free widget base URL                      |
 | `POSTS_FILE`        | `src/data/posts.json`          | Output file path                               |
 | `MAX_POSTS`         | `5`                            | Max posts to keep / display                    |
 | `X_EXCLUDE`         | `retweets,replies`             | Official API kinds to skip                     |
@@ -182,7 +182,8 @@ Notes:
 
 | Failure                              | Behaviour                                                              |
 | ------------------------------------ | ---------------------------------------------------------------------- |
-| Free widget blocked / empty response | Logs a clear warning, exits 0, leaves `posts.json` untouched.           |
+| Profile page has no tweet ids        | Likely an X login wall from that network — logs a warning, exits 0, leaves `posts.json` untouched. |
+| oEmbed fails for one tweet           | Skips just that tweet, keeps the rest.                                  |
 | Missing `X_USERNAME`                 | Fails fast (exit 1) with a clear message.                               |
 | Network / API / auth errors          | Retried 3× with backoff, then exit 1; `posts.json` untouched.           |
 | Rate limit (HTTP 429)                | Waits for `Retry-After` (capped), retries; exit 1 if it persists.       |
@@ -209,9 +210,12 @@ X-BLOG-SYNC.md                       ← this document
 
 ## Troubleshooting
 
-- **Log says "free source returned an empty response"** → X is blocking the free
-  widget from that network. Add `X_BEARER_TOKEN` (option 2) and the script
-  switches to the official API automatically.
+- **Log says "profile page returned no tweet ids"** → X served a login wall
+  from that network. Rerun the workflow; if it persists, add `X_BEARER_TOKEN`
+  (option 2) and the script switches to the official API automatically.
+- **Posts show text but no images** → the free provider intentionally keeps
+  `media` empty (oEmbed doesn't expose image URLs). Only the official API
+  (`X_BEARER_TOKEN`) fetches media.
 - **Workflow fails with 401 / 403** → `X_BEARER_TOKEN` invalid, or the X plan
   doesn't include read access.
 - **Nothing appears on the site** → check Vercel deployed the latest push, and
