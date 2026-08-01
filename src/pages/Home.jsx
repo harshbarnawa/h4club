@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import Layout from "../components/Layout"
 import ContributionGraph from "../components/ContributionGraph"
 import { useTheme } from "../context/ThemeContext"
-import { SkillsData, ExploringData, FunFacts, Quotes } from "../constants/skills"
+import { SkillsData, ExploringData, Quotes } from "../constants/skills"
 
 function Home() {
   const { darkMode } = useTheme()

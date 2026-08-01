@@ -1,4 +1,5 @@
 import Layout from "../components/Layout"
+import VoxelBuilder from "../components/VoxelBuilder"
 import { useTheme } from "../context/ThemeContext"
 
 function Renderer() {
@@ -11,37 +12,24 @@ function Renderer() {
           darkMode ? "border-[#262626]" : "border-[#d8d8d8]"
         }`}
       >
-        <div className="max-w-3xl mx-auto px-5 md:px-6 pt-40 pb-24">
+        <div className="max-w-5xl mx-auto px-5 md:px-6 pt-40 pb-24">
           <h2
-            className={`text-[11px] uppercase tracking-[3px] mb-12 ${
+            className={`text-[11px] uppercase tracking-[3px] mb-8 ${
               darkMode ? "text-[#7a7a7a]" : "text-[#8a8a8a]"
             }`}
           >
             Renderer
           </h2>
 
-          <div
-            className={`border rounded-[24px] p-8 md:p-10 text-center ${
-              darkMode
-                ? "border-[#262626] bg-[#151515]/70"
-                : "border-[#d8d8d8] bg-[#efefef]/70"
+          <p
+            className={`font-serif italic text-[15px] mb-10 ${
+              darkMode ? "text-[#b5b5b5]" : "text-[#6a6a6a]"
             }`}
           >
-            <p
-              className={`text-[32px] mb-6 ${
-                darkMode ? "text-[#444]" : "text-[#aaa]"
-              }`}
-            >
-              ◇
-            </p>
-            <p
-              className={`font-serif italic text-[17px] leading-[2] ${
-                darkMode ? "text-[#b5b5b5]" : "text-[#6a6a6a]"
-              }`}
-            >
-              Coming soon — something visual is cooking.
-            </p>
-          </div>
+            Draw on the slate — every pixel becomes a cube in the viewport.
+          </p>
+
+          <VoxelBuilder />
         </div>
       </section>
     </Layout>
