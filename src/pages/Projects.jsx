@@ -2,8 +2,6 @@ import Layout from "../components/Layout"
 import { useTheme } from "../context/ThemeContext"
 import { ProjectsData } from "../constants/projects"
 
-const initialLetter = (title) => title.charAt(0).toUpperCase()
-
 function Projects() {
   const { darkMode } = useTheme()
 
@@ -44,19 +42,14 @@ function Projects() {
                     rel="noreferrer"
                     className="block aspect-video relative overflow-hidden cursor-pointer"
                   >
-                    <div
-                      className={`w-full h-full flex items-center justify-center transition-transform duration-500 group-hover:scale-105 ${
-                        darkMode ? "bg-[#1e1e1e]" : "bg-[#e2e2e2]"
-                      }`}
-                    >
-                      <span
-                        className={`text-5xl md:text-6xl font-bold select-none ${
-                          darkMode ? "text-white/10" : "text-black/[0.06]"
-                        }`}
-                      >
-                        {initialLetter(project.title)}
-                      </span>
-                    </div>
+                    {project.image && (
+                      <img
+                        src={project.image}
+                        alt={`${project.title} preview`}
+                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
                       <span className="text-white text-[11px] uppercase tracking-[2px] border border-white/40 px-4 py-2 rounded-full backdrop-blur-sm">
                         View Project →
