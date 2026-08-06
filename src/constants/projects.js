@@ -1,11 +1,26 @@
 export const ProjectsData = [
   {
+  title: "PixelDraw3D",
+  live: "https://pixeldraw3d.vercel.app/",
+  repo: "https://github.com/harshbarnawa/pixeldraw3d",
+  desc: "AI-powered 3D pixel art generator that transforms text prompts into voxel models with live preview, export support and a modern responsive interface.",
+  image: "/assets/pixeldraw3d.png",
+},
+
+  {
     title: "OpenGuido",
     live: "https://openguido.vercel.app/",
     repo: "https://github.com/harshbarnawa/OpenGuidos",
     desc: "VS Code extension for easy code snippets, custom commands, competitive programming toolkit and faster development workflow.",
     image: "/assets/openguido.png",
   },
+  {
+  title: "MinToks",
+  live: "https://mintoks.vercel.app/",
+  repo: "https://github.com/harshbarnawa/mintoks",
+  desc: "Minimal short-video sharing platform featuring authentication, responsive UI, smooth interactions and a clean modern experience.",
+  image: "/assets/mintoks.png",
+},
   {
     title: "h4chat",
     live: "https://h4chat.vercel.app/",
